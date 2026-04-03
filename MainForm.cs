@@ -1,4 +1,5 @@
 using System.IO.Ports;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -13,6 +14,66 @@ public partial class MainForm : Form
     private static readonly Regex NpFrameRegex = new(
         "^@NP,KEY=(.*),CODE=0x([0-9A-Fa-f]{2})$",
         RegexOptions.Compiled);
+
+    private const uint InputKeyboard = 1;
+    private const uint KeyEventFKeyUp = 0x0002;
+
+    private const ushort VkBack = 0x08;
+    private const ushort Vk0 = 0x30;
+    private const ushort Vk9 = 0x39;
+    private const ushort VkOemPeriod = 0xBE;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct INPUT
+    {
+        public uint type;
+        public InputUnion U;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    private struct InputUnion
+    {
+        [FieldOffset(0)]
+        public MOUSEINPUT mi;
+
+        [FieldOffset(0)]
+        public KEYBDINPUT ki;
+
+        [FieldOffset(0)]
+        public HARDWAREINPUT hi;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MOUSEINPUT
+    {
+        public int dx;
+        public int dy;
+        public uint mouseData;
+        public uint dwFlags;
+        public uint time;
+        public UIntPtr dwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KEYBDINPUT
+    {
+        public ushort wVk;
+        public ushort wScan;
+        public uint dwFlags;
+        public uint time;
+        public UIntPtr dwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct HARDWAREINPUT
+    {
+        public uint uMsg;
+        public ushort wParamL;
+        public ushort wParamH;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
 
     public MainForm()
     {
@@ -169,7 +230,7 @@ public partial class MainForm : Form
             return;
         }
 
-        if (!TryMapSendKeys(code, out string token))
+        if (!TryMapVirtualKey(code, out ushort vkCode, out string mapName))
         {
             Log($"未映射 KEY={key}, CODE=0x{code:X2}");
             return;
@@ -179,8 +240,8 @@ public partial class MainForm : Form
         {
             try
             {
-                SendKeys.SendWait(token);
-                Log($"已发送 KEY={key}, CODE=0x{code:X2}, SEND={token}");
+                SendVirtualKey(vkCode);
+                Log($"已发送 KEY={key}, CODE=0x{code:X2}, VK={vkCode:X2}({mapName})");
             }
             catch (Exception ex)
             {
@@ -189,25 +250,73 @@ public partial class MainForm : Form
         }));
     }
 
-    private static bool TryMapSendKeys(byte code, out string token)
+    private static bool TryMapVirtualKey(byte code, out ushort vkCode, out string mapName)
     {
-        if (code >= 0x30 && code <= 0x39)
+        if (code >= Vk0 && code <= Vk9)
         {
-            token = ((char)code).ToString();
+            vkCode = code;
+            mapName = ((char)code).ToString();
             return true;
         }
 
         switch (code)
         {
             case 0x08:
-                token = "{BACKSPACE}";
+                vkCode = VkBack;
+                mapName = "BACK";
                 return true;
             case 0x2E:
-                token = ".";
+                vkCode = VkOemPeriod;
+                mapName = "OEM_PERIOD";
                 return true;
             default:
-                token = string.Empty;
+                vkCode = 0;
+                mapName = string.Empty;
                 return false;
+        }
+    }
+
+    private static void SendVirtualKey(ushort vkCode)
+    {
+        INPUT[] inputs =
+        [
+            new INPUT
+            {
+                type = InputKeyboard,
+                U = new InputUnion
+                {
+                    ki = new KEYBDINPUT
+                    {
+                        wVk = vkCode,
+                        wScan = 0,
+                        dwFlags = 0,
+                        time = 0,
+                        dwExtraInfo = UIntPtr.Zero
+                    }
+                }
+            },
+            new INPUT
+            {
+                type = InputKeyboard,
+                U = new InputUnion
+                {
+                    ki = new KEYBDINPUT
+                    {
+                        wVk = vkCode,
+                        wScan = 0,
+                        dwFlags = KeyEventFKeyUp,
+                        time = 0,
+                        dwExtraInfo = UIntPtr.Zero
+                    }
+                }
+            }
+        ];
+
+        uint sent = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
+        if (sent != inputs.Length)
+        {
+            int err = Marshal.GetLastWin32Error();
+            throw new InvalidOperationException($"SendInput 失败，Win32Error={err}");
         }
     }
 
