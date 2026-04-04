@@ -34,21 +34,22 @@ partial class MainForm
         // cmbPorts
         // 
         cmbPorts.DropDownStyle = ComboBoxStyle.DropDownList;
+        cmbPorts.DropDownWidth = 260;
         cmbPorts.Location = new Point(52, 12);
         cmbPorts.Name = "cmbPorts";
-        cmbPorts.Size = new Size(120, 25);
+        cmbPorts.Size = new Size(180, 25);
         cmbPorts.TabIndex = 1;
         // 
         // txtBaud
         // 
-        txtBaud.Location = new Point(236, 12);
+        txtBaud.Location = new Point(290, 12);
         txtBaud.Name = "txtBaud";
-        txtBaud.Size = new Size(90, 23);
+        txtBaud.Size = new Size(80, 23);
         txtBaud.TabIndex = 3;
         // 
         // btnRefresh
         // 
-        btnRefresh.Location = new Point(336, 11);
+        btnRefresh.Location = new Point(380, 11);
         btnRefresh.Name = "btnRefresh";
         btnRefresh.Size = new Size(70, 25);
         btnRefresh.TabIndex = 4;
@@ -57,9 +58,9 @@ partial class MainForm
         // 
         // btnConnect
         // 
-        btnConnect.Location = new Point(416, 11);
+        btnConnect.Location = new Point(460, 11);
         btnConnect.Name = "btnConnect";
-        btnConnect.Size = new Size(150, 25);
+        btnConnect.Size = new Size(110, 25);
         btnConnect.TabIndex = 5;
         btnConnect.Text = "连接";
         btnConnect.Click += btnConnect_Click;
@@ -71,7 +72,7 @@ partial class MainForm
         txtLog.Name = "txtLog";
         txtLog.ReadOnly = true;
         txtLog.ScrollBars = ScrollBars.Vertical;
-        txtLog.Size = new Size(554, 350);
+        txtLog.Size = new Size(558, 350);
         txtLog.TabIndex = 6;
         txtLog.TextChanged += txtLog_TextChanged;
         // 
@@ -87,7 +88,7 @@ partial class MainForm
         // lblBaud
         // 
         lblBaud.AutoSize = true;
-        lblBaud.Location = new Point(184, 15);
+        lblBaud.Location = new Point(250, 15);
         lblBaud.Name = "lblBaud";
         lblBaud.Size = new Size(44, 17);
         lblBaud.TabIndex = 2;
@@ -95,7 +96,7 @@ partial class MainForm
         // 
         // MainForm
         // 
-        ClientSize = new Size(578, 410);
+        ClientSize = new Size(582, 410);
         Controls.Add(lblPort);
         Controls.Add(cmbPorts);
         Controls.Add(lblBaud);

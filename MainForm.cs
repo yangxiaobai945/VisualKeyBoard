@@ -1,4 +1,5 @@
 using System.IO.Ports;
+using System.Management;
 using System.Text;
 using System.Text.RegularExpressions;
 using InputInterceptorNS;
@@ -7,6 +8,11 @@ namespace VisualKeyBoard;
 
 public partial class MainForm : Form
 {
+    private sealed record SerialPortItem(string PortName, string DisplayName)
+    {
+        public override string ToString() => DisplayName;
+    }
+
     private SerialPort? _serialPort;
     private readonly object _rxLock = new();
     private readonly StringBuilder _rxBuffer = new();
@@ -107,7 +113,7 @@ public partial class MainForm : Form
             return;
         }
 
-        string portName = cmbPorts.Text.Trim();
+        string portName = GetSelectedPortName();
         if (string.IsNullOrWhiteSpace(portName))
         {
             Log("请先选择串口");
@@ -147,21 +153,91 @@ public partial class MainForm : Form
     private void RefreshPorts()
     {
         string[] ports = SerialPort.GetPortNames().OrderBy(x => x).ToArray();
-        string prev = cmbPorts.Text;
+        string prevPortName = GetSelectedPortName();
 
-        cmbPorts.Items.Clear();
-        cmbPorts.Items.AddRange(ports);
+        var items = ports
+            .Select(portName => new SerialPortItem(portName, GetPortDisplayName(portName)))
+            .ToArray();
 
-        if (!string.IsNullOrWhiteSpace(prev) && ports.Contains(prev))
+        cmbPorts.BeginUpdate();
+        try
         {
-            cmbPorts.Text = prev;
+            cmbPorts.Items.Clear();
+            cmbPorts.Items.AddRange(items);
+
+            if (!string.IsNullOrWhiteSpace(prevPortName))
+            {
+                for (int i = 0; i < cmbPorts.Items.Count; i++)
+                {
+                    if (cmbPorts.Items[i] is SerialPortItem item && item.PortName == prevPortName)
+                    {
+                        cmbPorts.SelectedIndex = i;
+                        break;
+                    }
+                }
+            }
+
+            if (cmbPorts.SelectedIndex < 0 && cmbPorts.Items.Count > 0)
+            {
+                cmbPorts.SelectedIndex = 0;
+            }
         }
-        else if (ports.Length > 0)
+        finally
         {
-            cmbPorts.SelectedIndex = 0;
+            cmbPorts.EndUpdate();
         }
 
         Log("已刷新串口: " + ports.Length);
+    }
+
+    private static string GetPortDisplayName(string portName)
+    {
+        try
+        {
+            using ManagementObjectSearcher searcher = new(
+                "SELECT Name FROM Win32_PnPEntity WHERE Name LIKE '%(" + portName + ")%'");
+
+            foreach (ManagementObject obj in searcher.Get())
+            {
+                string? name = obj["Name"]?.ToString();
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    return name;
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        return portName;
+    }
+
+    private string GetSelectedPortName()
+    {
+        if (cmbPorts.SelectedItem is SerialPortItem item)
+        {
+            return item.PortName;
+        }
+
+        string text = cmbPorts.Text.Trim();
+        if (text.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        int start = text.LastIndexOf('(');
+        int end = text.LastIndexOf(')');
+        if (start >= 0 && end > start)
+        {
+            string candidate = text[(start + 1)..end].Trim();
+            if (candidate.StartsWith("COM", StringComparison.OrdinalIgnoreCase))
+            {
+                return candidate;
+            }
+        }
+
+        return text;
     }
 
     private void SerialPort_DataReceived(object sender, SerialDataReceivedEventArgs e)
