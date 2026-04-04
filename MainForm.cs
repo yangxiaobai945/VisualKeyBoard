@@ -11,6 +11,10 @@ public partial class MainForm : Form
     private readonly object _rxLock = new();
     private readonly StringBuilder _rxBuffer = new();
     private KeyboardHook? _keyboardHook;
+    private readonly ContextMenuStrip _txtLogMenu = new();
+    private readonly ToolStripMenuItem _txtLogClearItem;
+    private readonly ToolStripMenuItem _txtLogCopyItem;
+    private readonly ToolStripMenuItem _txtLogSelectAllItem;
 
     private static readonly Regex NpFrameRegex = new(
         "^@NP,KEY=(.*),CODE=0x([0-9A-Fa-f]{2})$",
@@ -26,9 +30,31 @@ public partial class MainForm : Form
     {
         InitializeComponent();
         txtBaud.Text = "115200";
+
+        _txtLogClearItem = new ToolStripMenuItem("清空日志", null, (_, _) => txtLog.Clear());
+        _txtLogCopyItem = new ToolStripMenuItem("复制", null, (_, _) => txtLog.Copy());
+        _txtLogSelectAllItem = new ToolStripMenuItem("全选", null, (_, _) => txtLog.SelectAll());
+
+        _txtLogMenu.Opening += TxtLogMenu_Opening;
+        _txtLogMenu.Items.AddRange(new ToolStripItem[]
+        {
+            _txtLogClearItem,
+            new ToolStripSeparator(),
+            _txtLogCopyItem,
+            _txtLogSelectAllItem
+        });
+        txtLog.ContextMenuStrip = _txtLogMenu;
+
         RefreshPorts();
         UpdateConnectionButtonText();
         this.InitializeInterceptionDriver();
+    }
+
+    private void TxtLogMenu_Opening(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        _txtLogClearItem.Enabled = txtLog.TextLength > 0;
+        _txtLogCopyItem.Enabled = txtLog.SelectionLength > 0;
+        _txtLogSelectAllItem.Enabled = txtLog.TextLength > 0;
     }
 
     private void InitializeInterceptionDriver()
@@ -56,9 +82,9 @@ public partial class MainForm : Form
             }
 
             InputInterceptor.Initialize();
-            
+
             _keyboardHook = new KeyboardHook(KeyboardHookCallback);
-            
+
             Log($"KeyboardHook 状态 - IsInitialized: {_keyboardHook.IsInitialized}, Active: {_keyboardHook.Active}, CanSimulateInput: {_keyboardHook.CanSimulateInput}");
             Log("Interception 驱动已就绪，可模拟真实硬件按键");
         }
@@ -366,5 +392,10 @@ public partial class MainForm : Form
         }
 
         txtLog.AppendText($"{DateTime.Now:HH:mm:ss} {msg}{Environment.NewLine}");
+    }
+
+    private void txtLog_TextChanged(object sender, EventArgs e)
+    {
+
     }
 }

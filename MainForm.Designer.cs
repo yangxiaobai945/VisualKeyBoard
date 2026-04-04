@@ -22,8 +22,6 @@ partial class MainForm
 
     private void InitializeComponent()
     {
-        components = new System.ComponentModel.Container();
-
         cmbPorts = new ComboBox();
         txtBaud = new TextBox();
         btnRefresh = new Button();
@@ -31,40 +29,72 @@ partial class MainForm
         txtLog = new TextBox();
         lblPort = new Label();
         lblBaud = new Label();
-
         SuspendLayout();
-
-        lblPort.Text = "串口";
-        lblPort.Location = new Point(12, 15);
-        lblPort.AutoSize = true;
-
+        // 
+        // cmbPorts
+        // 
         cmbPorts.DropDownStyle = ComboBoxStyle.DropDownList;
         cmbPorts.Location = new Point(52, 12);
-        cmbPorts.Size = new Size(120, 23);
-
-        lblBaud.Text = "波特率";
-        lblBaud.Location = new Point(184, 15);
-        lblBaud.AutoSize = true;
-
+        cmbPorts.Name = "cmbPorts";
+        cmbPorts.Size = new Size(120, 25);
+        cmbPorts.TabIndex = 1;
+        // 
+        // txtBaud
+        // 
         txtBaud.Location = new Point(236, 12);
+        txtBaud.Name = "txtBaud";
         txtBaud.Size = new Size(90, 23);
-
-        btnRefresh.Text = "刷新";
+        txtBaud.TabIndex = 3;
+        // 
+        // btnRefresh
+        // 
         btnRefresh.Location = new Point(336, 11);
+        btnRefresh.Name = "btnRefresh";
         btnRefresh.Size = new Size(70, 25);
+        btnRefresh.TabIndex = 4;
+        btnRefresh.Text = "刷新";
         btnRefresh.Click += btnRefresh_Click;
-
-        btnConnect.Text = "连接";
+        // 
+        // btnConnect
+        // 
         btnConnect.Location = new Point(416, 11);
+        btnConnect.Name = "btnConnect";
         btnConnect.Size = new Size(150, 25);
+        btnConnect.TabIndex = 5;
+        btnConnect.Text = "连接";
         btnConnect.Click += btnConnect_Click;
-
+        // 
+        // txtLog
+        // 
         txtLog.Location = new Point(12, 48);
-        txtLog.Size = new Size(554, 350);
         txtLog.Multiline = true;
-        txtLog.ScrollBars = ScrollBars.Vertical;
+        txtLog.Name = "txtLog";
         txtLog.ReadOnly = true;
-
+        txtLog.ScrollBars = ScrollBars.Vertical;
+        txtLog.Size = new Size(554, 350);
+        txtLog.TabIndex = 6;
+        txtLog.TextChanged += txtLog_TextChanged;
+        // 
+        // lblPort
+        // 
+        lblPort.AutoSize = true;
+        lblPort.Location = new Point(12, 15);
+        lblPort.Name = "lblPort";
+        lblPort.Size = new Size(32, 17);
+        lblPort.TabIndex = 0;
+        lblPort.Text = "串口";
+        // 
+        // lblBaud
+        // 
+        lblBaud.AutoSize = true;
+        lblBaud.Location = new Point(184, 15);
+        lblBaud.Name = "lblBaud";
+        lblBaud.Size = new Size(44, 17);
+        lblBaud.TabIndex = 2;
+        lblBaud.Text = "波特率";
+        // 
+        // MainForm
+        // 
         ClientSize = new Size(578, 410);
         Controls.Add(lblPort);
         Controls.Add(cmbPorts);
@@ -73,7 +103,7 @@ partial class MainForm
         Controls.Add(btnRefresh);
         Controls.Add(btnConnect);
         Controls.Add(txtLog);
-
+        Name = "MainForm";
         Text = "VisualKeyBoard";
         FormClosing += MainForm_FormClosing;
         ResumeLayout(false);
