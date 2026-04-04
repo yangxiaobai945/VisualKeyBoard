@@ -7,10 +7,15 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$solutionPath = Join-Path $scriptDir "VisualKeyBoard.sln"
+$slnxPath = Join-Path $scriptDir "VisualKeyBoard.slnx"
+$slnPath = Join-Path $scriptDir "VisualKeyBoard.sln"
 
-if (-not (Test-Path $solutionPath)) {
-    throw "Solution file not found: $solutionPath"
+if (Test-Path $slnxPath) {
+    $solutionPath = $slnxPath
+} elseif (Test-Path $slnPath) {
+    $solutionPath = $slnPath
+} else {
+    throw "Solution file not found. Expected one of: $slnxPath, $slnPath"
 }
 
 Write-Host "==> Restoring packages..." -ForegroundColor Cyan
