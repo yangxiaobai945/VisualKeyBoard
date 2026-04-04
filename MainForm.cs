@@ -1,7 +1,7 @@
 using System.IO.Ports;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using InputInterceptorNS;
 
 namespace VisualKeyBoard;
 
@@ -10,76 +10,62 @@ public partial class MainForm : Form
     private SerialPort? _serialPort;
     private readonly object _rxLock = new();
     private readonly StringBuilder _rxBuffer = new();
+    private KeyboardHook? _keyboardHook;
 
     private static readonly Regex NpFrameRegex = new(
         "^@NP,KEY=(.*),CODE=0x([0-9A-Fa-f]{2})$",
         RegexOptions.Compiled);
 
-    private const uint InputKeyboard = 1;
-    private const uint KeyEventFKeyUp = 0x0002;
-
     private const ushort VkBack = 0x08;
     private const ushort Vk0 = 0x30;
     private const ushort Vk9 = 0x39;
-    private const ushort VkOemPeriod = 0xBE;
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct INPUT
-    {
-        public uint type;
-        public InputUnion U;
-    }
-
-    [StructLayout(LayoutKind.Explicit)]
-    private struct InputUnion
-    {
-        [FieldOffset(0)]
-        public MOUSEINPUT mi;
-
-        [FieldOffset(0)]
-        public KEYBDINPUT ki;
-
-        [FieldOffset(0)]
-        public HARDWAREINPUT hi;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct MOUSEINPUT
-    {
-        public int dx;
-        public int dy;
-        public uint mouseData;
-        public uint dwFlags;
-        public uint time;
-        public UIntPtr dwExtraInfo;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct KEYBDINPUT
-    {
-        public ushort wVk;
-        public ushort wScan;
-        public uint dwFlags;
-        public uint time;
-        public UIntPtr dwExtraInfo;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct HARDWAREINPUT
-    {
-        public uint uMsg;
-        public ushort wParamL;
-        public ushort wParamH;
-    }
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+    private const ushort VkNumpad0 = 0x60;
+    private const ushort VkNumpad9 = 0x69;
 
     public MainForm()
     {
         InitializeComponent();
         txtBaud.Text = "115200";
         RefreshPorts();
+        UpdateConnectionButtonText();
+        this.InitializeInterceptionDriver();
+    }
+
+    private void InitializeInterceptionDriver()
+    {
+        try
+        {
+            if (!InputInterceptor.CheckDriverInstalled())
+            {
+                if (!InputInterceptor.CheckAdministratorRights())
+                {
+                    MessageBox.Show("请以【管理员身份】运行程序来安装驱动！", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                Log("正在安装 Interception 驱动...");
+                if (InputInterceptor.InstallDriver())
+                {
+                    Log("驱动安装成功！请重启程序后再使用。");
+                }
+                else
+                {
+                    Log("驱动安装失败，请检查杀毒软件或手动安装。");
+                }
+                return;
+            }
+
+            InputInterceptor.Initialize();
+            
+            _keyboardHook = new KeyboardHook(KeyboardHookCallback);
+            
+            Log($"KeyboardHook 状态 - IsInitialized: {_keyboardHook.IsInitialized}, Active: {_keyboardHook.Active}, CanSimulateInput: {_keyboardHook.CanSimulateInput}");
+            Log("Interception 驱动已就绪，可模拟真实硬件按键");
+        }
+        catch (Exception ex)
+        {
+            Log("驱动初始化失败: " + ex.Message);
+        }
     }
 
     private void btnRefresh_Click(object? sender, EventArgs e)
@@ -91,7 +77,7 @@ public partial class MainForm : Form
     {
         if (_serialPort is { IsOpen: true })
         {
-            Log("串口已连接");
+            ClosePort();
             return;
         }
 
@@ -117,17 +103,14 @@ public partial class MainForm : Form
             };
             _serialPort.DataReceived += SerialPort_DataReceived;
             _serialPort.Open();
+            UpdateConnectionButtonText();
             Log($"已连接 {portName} @ {baud}");
         }
         catch (Exception ex)
         {
             Log("连接失败: " + ex.Message);
+            UpdateConnectionButtonText();
         }
-    }
-
-    private void btnDisconnect_Click(object? sender, EventArgs e)
-    {
-        ClosePort();
     }
 
     private void MainForm_FormClosing(object? sender, FormClosingEventArgs e)
@@ -258,6 +241,12 @@ public partial class MainForm : Form
             mapName = ((char)code).ToString();
             return true;
         }
+        if (code >= VkNumpad0 && code <= VkNumpad9)
+        {
+            vkCode = code;
+            mapName = "NUMPAD_" + (code - VkNumpad0);
+            return true;
+        }
 
         switch (code)
         {
@@ -266,8 +255,9 @@ public partial class MainForm : Form
                 mapName = "BACK";
                 return true;
             case 0x2E:
-                vkCode = VkOemPeriod;
-                mapName = "OEM_PERIOD";
+                // map to numpad dot
+                vkCode = 0x2E; // VK_DELETE
+                mapName = "NUMPAD_DOT";
                 return true;
             default:
                 vkCode = 0;
@@ -276,48 +266,60 @@ public partial class MainForm : Form
         }
     }
 
-    private static void SendVirtualKey(ushort vkCode)
+    private void SendVirtualKey(ushort vkCode)
     {
-        INPUT[] inputs =
-        [
-            new INPUT
-            {
-                type = InputKeyboard,
-                U = new InputUnion
-                {
-                    ki = new KEYBDINPUT
-                    {
-                        wVk = vkCode,
-                        wScan = 0,
-                        dwFlags = 0,
-                        time = 0,
-                        dwExtraInfo = UIntPtr.Zero
-                    }
-                }
-            },
-            new INPUT
-            {
-                type = InputKeyboard,
-                U = new InputUnion
-                {
-                    ki = new KEYBDINPUT
-                    {
-                        wVk = vkCode,
-                        wScan = 0,
-                        dwFlags = KeyEventFKeyUp,
-                        time = 0,
-                        dwExtraInfo = UIntPtr.Zero
-                    }
-                }
-            }
-        ];
-
-        uint sent = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
-        if (sent != inputs.Length)
+        if (_keyboardHook == null)
         {
-            int err = Marshal.GetLastWin32Error();
-            throw new InvalidOperationException($"SendInput 失败，Win32Error={err}");
+            Log("键盘钩子未初始化");
+            return;
         }
+
+        KeyCode key = MapVkToKeyCode(vkCode);
+        try
+        {
+            bool success = _keyboardHook.SimulateKeyPress(key, 30);
+            Log($"已发送按键: 0x{vkCode:X2} (Interception成功={success})");
+        }
+        catch (Exception ex)
+        {
+            Log($"Interception 异常: {ex.Message}");
+        }
+    }
+
+    private static KeyCode MapVkToKeyCode(ushort vk)
+    {
+        switch (vk)
+        {
+            case 0x08: return KeyCode.Backspace;
+            case 0x30: return KeyCode.Numpad0;
+            case 0x31: return KeyCode.Numpad1;
+            case 0x32: return KeyCode.Numpad2;
+            case 0x33: return KeyCode.Numpad3;
+            case 0x34: return KeyCode.Numpad4;
+            case 0x35: return KeyCode.Numpad5;
+            case 0x36: return KeyCode.Numpad6;
+            case 0x37: return KeyCode.Numpad7;
+            case 0x38: return KeyCode.Numpad8;
+            case 0x39: return KeyCode.Numpad9;
+            case 0xBE: return KeyCode.Dot;
+            //add Numapd0-9
+            case 0x60: return KeyCode.Numpad0;
+            case 0x61: return KeyCode.Numpad1;
+            case 0x62: return KeyCode.Numpad2;
+            case 0x63: return KeyCode.Numpad3;
+            case 0x64: return KeyCode.Numpad4;
+            case 0x65: return KeyCode.Numpad5;
+            case 0x66: return KeyCode.Numpad6;
+            case 0x67: return KeyCode.Numpad7;
+            case 0x68: return KeyCode.Numpad8;
+            case 0x69: return KeyCode.Numpad9;
+            case 0x2E: return KeyCode.NumpadDelete;
+            default: return KeyCode.Escape;
+        }
+    }
+
+    private void KeyboardHookCallback(ref KeyStroke keyStroke)
+    {
     }
 
     private void ClosePort()
@@ -335,11 +337,24 @@ public partial class MainForm : Form
                 _serialPort = null;
                 Log("串口已断开");
             }
+
+            UpdateConnectionButtonText();
         }
         catch (Exception ex)
         {
             Log("断开异常: " + ex.Message);
         }
+    }
+
+    private void UpdateConnectionButtonText()
+    {
+        if (btnConnect.IsHandleCreated && btnConnect.InvokeRequired)
+        {
+            btnConnect.BeginInvoke(new Action(UpdateConnectionButtonText));
+            return;
+        }
+
+        btnConnect.Text = _serialPort is { IsOpen: true } ? "断开" : "连接";
     }
 
     private void Log(string msg)

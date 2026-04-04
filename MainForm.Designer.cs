@@ -7,7 +7,6 @@ partial class MainForm
     private TextBox txtBaud = null!;
     private Button btnRefresh = null!;
     private Button btnConnect = null!;
-    private Button btnDisconnect = null!;
     private TextBox txtLog = null!;
     private Label lblPort = null!;
     private Label lblBaud = null!;
@@ -29,7 +28,6 @@ partial class MainForm
         txtBaud = new TextBox();
         btnRefresh = new Button();
         btnConnect = new Button();
-        btnDisconnect = new Button();
         txtLog = new TextBox();
         lblPort = new Label();
         lblBaud = new Label();
@@ -58,13 +56,8 @@ partial class MainForm
 
         btnConnect.Text = "连接";
         btnConnect.Location = new Point(416, 11);
-        btnConnect.Size = new Size(70, 25);
+        btnConnect.Size = new Size(150, 25);
         btnConnect.Click += btnConnect_Click;
-
-        btnDisconnect.Text = "断开";
-        btnDisconnect.Location = new Point(496, 11);
-        btnDisconnect.Size = new Size(70, 25);
-        btnDisconnect.Click += btnDisconnect_Click;
 
         txtLog.Location = new Point(12, 48);
         txtLog.Size = new Size(554, 350);
@@ -79,7 +72,6 @@ partial class MainForm
         Controls.Add(txtBaud);
         Controls.Add(btnRefresh);
         Controls.Add(btnConnect);
-        Controls.Add(btnDisconnect);
         Controls.Add(txtLog);
 
         Text = "VisualKeyBoard";

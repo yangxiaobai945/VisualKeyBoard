@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="InputInterceptor" Version="2.2.1" />
     <PackageReference Include="System.IO.Ports" Version="9.0.0" />
   </ItemGroup>
 </Project>
